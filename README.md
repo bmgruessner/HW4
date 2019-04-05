@@ -1,5 +1,6 @@
 # HW4-Malaria data in three charts
-##Brian Gruessner, 20190404
+*Brian Gruessner, 20190404
+
 https://bmgruessner.github.io/HW4/
 
 This vis shows data on malaria mortality in children under five.  It shows the rates of death, by country, form 2000 to 2016, by total
@@ -12,7 +13,8 @@ metric.  The final is a parallel coordinates plot that compares metric of chosen
 select countries in the other two, the time chart can be used to select the year for the other two, and the parallel coordinates chart can
 select the metric for the other two.
 
-###Design:
+*Design:
+
 -One major challenge in this vis was to handle a large number of categorical variables (countries) at once.  To limit the number of bars in
 the bar chart that could fit on the screen at once, countries with no mortality from malaria were excluded.  A wide-ranging rainbow color
 scheme was used [2]. even with these features, there were many countries, which could not be reliably color-coded to be individually
@@ -28,7 +30,8 @@ countries with lots of deaths.  Mortality from major sources of death drop by ha
 but looks miniscule on a logarithmic scale.  Therefore, a log scale was used for the bar chart and the linear scale was used for the line
 charts.
 
-###Technical:
+*Technical:
+
 -An important problem in this homework was formatting of the data.  The line chart did not work without a nesting of the data [3],
 (thanks Lane)
 
