@@ -1,0 +1,801 @@
+
+
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<html>
+<body>
+<p id="welcome"> <font size="2">Malaria data from https://data.unicef.org/resources/dataset/malaria/ </p>
+<script>
+
+//http://bl.ocks.org/d3noob/d8be922a10cb0b148cd5
+var margin = ({top: 10, left: 50, right: 50, bottom: 120});  //margins for window for bar graph
+var barwindow = ({width: 1200, height: 230}); //dimensions of window for bar graph
+var linewindow = ({width: 1200, height: 225}); //dimensions of line charts
+var barwidth=8 //width of bar on bar chart
+var xAxisInt= barwindow.height - margin.bottom-5
+var theYear=2000;  //default year for year-dependent data
+var opa = 0.6 //opacity of circles
+var metric="fufive8";  //default metric for metric-dependent data
+var cdisp=["Nigeria", "DemocraticRepublicoftheCongo", "Mali", "BurkinaFaso", "Niger"]; 
+var cdispfilter; //a new cdisp for updating purposes
+var metricArray= ["Total deaths (under 5 years old)", "Under five yo deaths/1000 births", "Pct under five yo deaths from malaria"];
+var mTArray = ["ufive8", "rufive8", "fufive8"]
+var cRadius=7 //radius of circles
+var mrSmooth=d3.transition()  //transition helper 
+  .duration(500)
+  .ease(d3.easeLinear);
+var useData=[]; //countries to be displayed in bar Chart
+//cdisp is an array of countries to display.  The default five are the five with the greatest absolute fufive8
+
+//function, returns fancy name of abbreviated metric
+function explainMet(abbrev)
+{
+  return metricArray [mTArray.indexOf(abbrev)];
+};
+//load and parse the data
+d3.csv("MalariaDataC.csv").then( function(data) 
+{
+  data.forEach(function(d) 
+  {
+    d.year = +d.year;
+    d.ufive8 = +d.ufive8;
+    d.rufive8= +d.rufive8;
+    d.fufive8= +d.fufive8;
+
+    //only include countries with death in 2000
+    //countries with no deaths not interesting
+    if ((d.year == 2000) && (d.ufive8>0))
+    {
+      useData.push(d.country);
+    }
+    //0 deaths at later dates mess up log scales!
+    if(d.ufive8==0)
+      d.ufive8=0.5;
+
+  }); 
+  
+  //color scale
+  var colorScale = d3.scaleBand()
+    .domain( data.map( function(d) { return d.country; }))
+    .range(['blue', 'orange']);
+
+  //country scale
+  var xAxisScale=d3.scaleBand()
+    .domain(data.filter(function(d){return useData.includes(d.country);})
+      .map(function(d){return d.country;}))
+    .range([0, barwindow.width-margin.right]);
+    console.log(xAxisScale());
+
+  var xAx=d3.axisBottom()
+    .scale(xAxisScale);
+  
+  //year scale
+  var xYearScale=d3.scaleBand()
+  .domain(data.filter(function(d){return cdisp.includes(d.country) ;})
+    .map(function(d){return d.year;}))
+  .range([0, linewindow.width-margin.right]);
+    
+  var xYAx=d3.axisBottom()
+    .scale(xYearScale);
+  
+    //metrics scale
+  var xMetScale=d3.scaleBand()
+    .domain(mTArray)
+    .range( [0, linewindow.width-margin.right] );
+  
+  var xMetScale2=d3.scaleBand()
+  .domain(metricArray)
+  .range( [0, linewindow.width-margin.right] );
+    
+  var xMtx=d3.axisBottom()
+    .scale(xMetScale2);
+
+  //ufive scale
+  var yUAxisScale=d3.scaleLinear()
+    .domain([0,d3.max(data, function(d) {return d.ufive8;} )+50000 ])
+    .range([linewindow.height-margin.bottom, margin.top])
+  var yUAx=d3.axisLeft()
+    .scale(yUAxisScale);
+
+    //ufive8 scale(logarithmic for bar chart)
+  var yUAxisScaleB=d3.scaleLog()
+    .domain([0.5,d3.max(data, function(d) {return d.ufive8;} )+50000 ])
+    .range([linewindow.height-margin.bottom, margin.top])
+  var yUAxB=d3.axisLeft()
+    .scale(yUAxisScaleB);
+  
+  //rufive scale
+  var yRAxisScale= d3.scaleLinear()
+    .domain([0, d3.max(data, function(d){return d.rufive8;} )+20 ] )
+    .range([linewindow.height-margin.bottom, margin.top])
+  var yRAx=d3.axisLeft()
+    .scale(yRAxisScale)
+
+  //fufive scale
+  var yFAxisScale=d3.scaleLinear()
+    .domain([0,d3.max(data, function(d){return d.fufive8;} )+0.1 ])
+    .range([linewindow.height-margin.bottom, margin.top])
+  var yFAx=d3.axisLeft()
+    .scale(yFAxisScale);
+
+  function rightMetric(d)
+  {
+    if (metric=="ufive8")
+    {
+      return yUAxisScale(d.ufive8)
+    }
+    if (metric=="rufive8")
+    {
+      return yRAxisScale(d.rufive8)
+    }  
+    if (metric=="fufive8")
+    {
+      return yFAxisScale(d.fufive8)
+    }  
+  };
+
+  //calculates metrics for bar charts
+  function rightMetricB(d)
+  {
+    if (metric=="ufive8")
+    {
+      return yUAxisScaleB(d.ufive8)
+    }
+    if (metric=="rufive8")
+    {
+      return yRAxisScale(d.rufive8)
+    }  
+    if (metric=="fufive8")
+    {
+      return yFAxisScale(d.fufive8)
+    }  
+  };
+
+  function rightMD(d)
+  {
+    if (metric=="ufive8")
+    {
+      return yUAxisScale(d[1])
+    }
+    if (metric=="rufive8")
+    {
+      return yRAxisScale(d[2])
+    }  
+    if (metric=="fufive8")
+    {
+      return yFAxisScale(d[3])
+    }  
+  };
+
+  function rightAxisB()
+  {
+    if (metric=="ufive8")
+    {
+      return yUAxB;
+    }
+    if (metric=="rufive8")
+    {
+      return yRAx;
+    }  
+    if (metric=="fufive8")
+    {
+      return yFAx;
+    }  
+  };
+
+  function rightAxisL()
+  {
+    if (metric=="ufive8")
+    {
+      return yUAx;
+    }
+    if (metric=="rufive8")
+    {
+      return yRAx;
+    }  
+    if (metric=="fufive8")
+    {
+      return yFAx;
+    }  
+  };
+  
+  //sets up the bar chart axes
+  var barChart1 = d3.select("body").append('svg')
+    .attr("width", 1500)
+    .attr("height", barwindow.height)
+    .attr("x", margin.left)
+    .attr("y", 0);
+  //Putting together bar chart 1
+  makeBars();
+  function makeBars()
+  {
+    barChart1.selectAll("rect")
+      .data(data.filter(function(d){ return ( (d.year==theYear) && (useData.includes(d.country)) ); }))
+      .enter()
+      .append("rect")
+      .attr("id", function (d){return d.country; } )
+      .attr("x", function(d, i){return xAxisScale(d.country) + margin.left + barwindow.width/195/2; } )
+      .attr("y", function(d, i){return rightMetricB(d);})
+      .attr("height", function(d) {return xAxisInt - rightMetricB(d)  ;} )
+      .attr("width", barwidth)
+      //https://github.com/d3/d3-scale for rainbow scale
+      .attr("fill", function(d, i){return d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) ;} )
+      .attr("stroke", "red")
+      .attr("stroke-width", function (d, i){if ( cdisp.includes(d.country)) {return 4;} else{return 0;} } ) 
+      .on("click", toggleCountry)
+      .on("mouseover", function(d)
+      {
+        if (cdisp.includes(d.country))
+        {
+          console.log('activated')
+          barChart1.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width", 4);
+
+          lineChart1.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+
+          lineChart2.selectAll('#'+d.country+'U')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country+'R')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country+'F')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+        }
+      })
+      .on("mouseout", function(d)
+      {
+        if (cdisp.includes(d.country))
+        {
+          console.log('activated')
+          barChart1.selectAll('#'+d.country)
+            .attr("stroke", "red")
+            .attr("stroke-width", 4);
+
+          lineChart1.selectAll('#'+d.country)
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",2);
+
+          lineChart2.selectAll('#'+d.country+'U')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0 );
+          lineChart2.selectAll('#'+d.country+'R')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0);
+          lineChart2.selectAll('#'+d.country+'F')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0);
+          lineChart2.selectAll('#'+d.country)
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",2);
+        }
+      });
+  } ; 
+       
+  //bar chart 1 x axis
+  xGroup = barChart1.append('g')
+    .attr("transform", "translate( "+ margin.left +", "+ xAxisInt +")")
+    .call(xAx)
+    .selectAll("text")
+      .attr("y", 1)
+      .attr("x", 2)
+      .attr("transform", "rotate(45)")
+      .style("font", "10px times")
+      .style("text-anchor", "start");
+
+  //bar chart 1 y axis
+  yGroup = barChart1.append('g')
+    .attr("id", "currentAxisB1")
+    .attr("transform", "translate( "+ margin.left +", "+ 0 +")")
+    .call(rightAxisB());
+  
+  //bar chart 1 title
+  barChart1.append("text")
+    .attr("id", "BC1Title")
+    .attr("x", barwindow.width/2)
+    .attr("y", 0 + margin.top/1.5)
+    .attr("text-anchor", "middle")
+    .attr("font-size", "10px")
+    .text( explainMet(metric) + " by country, "+theYear);
+
+  //line graph for Year
+  var lineChart1 = d3.select("body").append('svg')
+    .attr("width", 1200)
+    .attr("height", 150)
+    .attr("x", margin.left)
+    .attr("y", 0);
+ 
+  //code from Lane Harrison
+  //arrange the csv
+  var dataforline;
+  var entries = d3.nest()
+    .key(function(d) { return d.country; } )
+    //.key(function(d) {return d.country; } )
+    .entries(data);
+  
+  dataforline = entries.map(function(row) 
+  {
+    vals = row.values.map(function (v)
+    {
+      return [v.year, v.ufive8, v.rufive8, v.fufive8];
+    } )
+    return{ country: row.key, values: vals};
+  } ) ;
+
+  drawLG1Stuff();
+  function drawLG1Stuff()
+  {
+     //gonna draw lines for each member of the dataforline data
+    var oldx;
+    var oldy;
+    var newx;
+    var newy;
+    dataforline.filter(function (a){return cdisp.includes(a.country)})
+      .forEach(function(a)
+        {
+          newx= xYearScale( a.values[0][0] );
+          newy= rightMD(a.values[0]) ;
+          a.values.forEach(function(b)
+          {
+            oldx= newx;
+            oldy = newy;
+
+            newx= xYearScale(b[0]);
+            newy= rightMD(b);
+
+          lineChart1.append("line")
+            .attr("id", a.country)
+            .attr("x1", oldx + 1.7*margin.left)
+            .attr("y1", oldy)
+            .attr("x2", newx + 1.7*margin.left)
+            .attr("y2", newy)
+            .attr("stroke-width", 2)
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width))
+            .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+          } ) ;
+        
+        } ) ; 
+
+    //Putting together line graph 1  
+    lineChart1.selectAll("circle")
+      .data(data.filter(function(d) { return cdisp.includes( d.country);}))
+        .enter()
+        .append("circle")
+        //.data(data)
+        .attr("id", function(d, i){return d.country})
+        .attr("cx", function(d, i){return xYearScale(d.year) + 1.7 * margin.left; } )
+        .attr("cy", function(d, i){return rightMetric(d);})
+        .attr("fill", function(d, i){return d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) ;} )
+        .style("opacity", opa)
+        .on("click", changeTime)
+        .attr("r", cRadius);
+  }
+
+  //x axis (year) for line chart 1
+  xYGroup = lineChart1.append('g')
+    .attr("transform", "translate( "+ margin.left +", "+ xAxisInt +")")
+    .call(xYAx)
+    .selectAll("text")
+      .attr("y", 1)
+      .attr("x", 2)
+      .attr("transform", "rotate(45)")
+      .style("font", "10px times")
+      .style("text-anchor", "start");
+
+  //y axis for line chart 1
+  yGroup = lineChart1.append('g')
+    .attr("id", "currentAxisL1")
+    .attr("transform", "translate( "+ margin.left +", "+ 0 +")")
+    .call(rightAxisL());
+
+  //line chart 1 title
+  lineChart1.append("text")
+  .attr("id", "LC1Title")
+  .attr("x", barwindow.width/2)
+  .attr("y", 0 + margin.top/1.5)
+  .attr("text-anchor", "middle")
+  .attr("font-size", "10px")
+  .text( explainMet(metric) + " by year");
+
+  //lineChart2: Parallel lines graph for Metrics
+  var lineChart2 = d3.select("body").append('svg')
+      .attr("width", 1200)
+      .attr("height", 350)
+
+  drawLG2Stuff();
+  function drawLG2Stuff()
+  {
+    //Putting together line graph 2  
+    lineChart2.selectAll("#ufive8")
+      .data(data.filter(function(d) { return cdisp.includes( d.country) && theYear==d.year ;}))
+      .enter()
+        .append("circle")
+        .attr("id", function(d, i){return d.country+"U";} )
+        .attr("cx", function(d, i){return xMetScale("ufive8") + margin.left * 4.8; } )
+        .attr("cy", function(d, i){return yUAxisScale(d.ufive8);})
+        .attr("fill", function(d, i){return d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) ;} )
+        .style("opacity", opa)
+        .on("click", metricSelectU)
+        .attr("r", cRadius);
+      
+    lineChart2.selectAll("#rufive8")
+      .data(data.filter(function(d) { return cdisp.includes( d.country) && theYear==d.year ;}))
+      .enter()
+        .append("circle")
+        .attr("id", function(d, i){return d.country+"R";} )
+        .attr("cx", function(d, i){return xMetScale("rufive8") + margin.left * 4.8; } )
+        .attr("cy", function(d, i){return yRAxisScale(d.rufive8);})
+        .attr("fill", function(d, i){return d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) ;} )
+        .style("opacity", opa)
+        .on("click", metricSelectR)
+        .attr("r", cRadius);
+
+    lineChart2.selectAll("#fufive8")
+      .data(data.filter(function(d) { return cdisp.includes( d.country) && theYear==d.year ;}))
+      .enter()
+        .append("circle")
+        .attr("id", function(d, i){return d.country+"F";} )
+        .attr("cx",  function(d, i){return xMetScale("fufive8") + margin.left * 4.8 ;})
+        .attr("cy", function(d, i){return yFAxisScale(d.fufive8);})
+        .attr("fill", function(d, i){return d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) ;} )
+        .style("opacity", opa)
+        .on("click", metricSelectF)
+        .attr("r", cRadius);
+
+    dataforline.filter(function (a){return cdisp.includes(a.country)})
+      .forEach(function(a)
+      {
+        newx= xMetScale( "ufive8" )+margin.left * 4.8;
+        newy= yUAxisScale(a.values[theYear-2000][1]);
+        a.values.forEach(function(b)
+        {
+          if (b[0]== theYear)
+          {
+            oldx= newx;
+            oldy = newy;
+          
+            newx= xMetScale("rufive8") +margin.left*4.8;
+            newy=  yRAxisScale(b[2]);
+
+            lineChart2.append("line")
+              .attr("id", a.country)
+              .attr("x1", oldx)
+              .attr("y1", oldy)
+              .attr("x2", newx)
+              .attr("y2", newy)
+              .attr("stroke-width", 2)
+              .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+              .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width));
+
+            oldx= newx;
+            oldy = newy;
+            newx= xMetScale("fufive8")+margin.left*4.8;
+            newy=  yFAxisScale(b[3]);
+
+            lineChart2.append("line")
+              .attr("id", a.country)
+              .attr("x1", oldx)
+              .attr("y1", oldy)
+              .attr("x2", newx)
+              .attr("y2", newy)
+              .attr("stroke-width", 2)
+              .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+              .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width));
+          }
+        } ) ; 
+      } ) ;   
+  }
+
+  //line chart 2 x axis
+  xYGroup = lineChart2.append('g')
+    .attr("transform", "translate( "+ margin.left +", "+ xAxisInt +")")
+    .call(xMtx)
+    .selectAll("text")
+      .attr("y", 1)
+      .style("font", "10px times")
+      .style("text-anchor", "start");
+
+  //line chart 2 y axes
+  yUGroup = lineChart2.append('g')
+    .attr("transform", "translate( "+ 230 +", "+ 0 +")")
+    .call(yUAx);
+  yFGroup = lineChart2.append('g')
+    .attr("transform", "translate( "+ 1000 +", "+ 0 +")")
+    .call(yFAx);
+  yRGroup = lineChart2.append('g')
+    .attr("transform", "translate( "+ 615 +", "+ 0 +")")
+    .call(yRAx);
+
+  //line chart 2 title
+  lineChart2.append("text")
+  .attr("id", "LC2Title")
+  .attr("x", barwindow.width/2)
+  .attr("y", 0 + margin.top/1.5)
+  .attr("text-anchor", "middle")
+  .attr("font-size", "10px")
+  .text( "Malaria mortality metrics, "+theYear);
+
+  function toggleCountry(rectc)
+  {
+    //toggles off countries that had been selected
+    if( cdisp.includes(rectc.country) )
+    {
+      cdispfilter= cdisp.filter(function(a){return a != rectc.country; } );
+      barChart1.select('rect[id='+rectc.country+']')
+        .attr("stroke-width", 0);
+
+      lineChart1.selectAll('circle[id='+rectc.country+']')
+        .remove();
+      lineChart1.selectAll('line[id='+rectc.country+']')
+        .remove();
+
+      lineChart2.selectAll('circle[id='+rectc.country+'U]')
+        .remove();      
+      lineChart2.selectAll('circle[id='+rectc.country+'R]')
+        .remove();  
+      lineChart2.selectAll('circle[id='+rectc.country+'F]')
+        .remove();          
+      lineChart2.selectAll('line[id='+rectc.country+']')
+        .remove();
+
+      cdisp=cdispfilter;
+    }
+    //toggles on countries that were not selected
+    else
+    {
+      cdispfilter=cdisp.slice();
+      cdispfilter.push(rectc.country);
+
+      barChart1.select('rect[id='+rectc.country+']')
+          .transition(mrSmooth)
+          .attr("stroke-width", 4);
+        
+        tdata1=data.filter(function(d){return cdisp.includes(d.country);});
+        tdata2=data.filter(function(d){return rectc.country==d.country;});
+        tdata1=tdata1.concat(tdata2);;
+          lineChart1.selectAll("circle")
+            .data(tdata1)
+            .enter()
+            .append("circle")
+              .attr("id", d => d.country)
+              .attr("cx", d => xYearScale(d.year) + 1.7 * margin.left )
+              .attr("cy", d=> rightMetric(d))
+              .attr("fill", d => d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width) )
+              .style("opacity", opa)
+              .on("click", changeTime)
+              .attr("r", cRadius);
+        
+        dataforline.filter(function (a){return a.country == rectc.country;})
+          .forEach(function(a)
+          {
+
+            newx= xYearScale( a.values[0][0] );
+            newy= rightMD(a.values[0]);
+            a.values.forEach(function(b)
+            {
+              oldx= newx;
+              oldy = newy;
+
+              newx= xYearScale(b[0]);
+              newy= rightMD(b);
+
+              lineChart1.append("line")
+                .attr("id", a.country)
+                .attr("x1", oldx + 1.7*margin.left)
+                .attr("y1", oldy)
+                .attr("x2", newx + 1.7*margin.left)
+                .attr("y2", newy)
+                .attr("stroke-width", 2)
+                .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+                .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width));
+              
+              if (b[0] == theYear)
+              {
+                lineChart2.append("circle")
+                  .attr("id", a.country+'U')
+                  .attr("cx", xMetScale("ufive8") + margin.left * 4.8 )
+                  .attr("cy", yUAxisScale(b[1]))
+                  .attr("fill", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width) )
+                  .style("opacity", opa)
+                  .on("click", metricSelectU)
+                  .attr("r", cRadius);
+                lineChart2.append("circle")
+                  .attr("id", a.country+'R' )
+                  .attr("cx", xMetScale("rufive8") + margin.left * 4.8 )
+                  .attr("cy", yRAxisScale(b[2]) )
+                  .attr("fill", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width)  )
+                  .style("opacity", opa)
+                  .on("click", metricSelectR)
+                  .attr("r", cRadius);
+                lineChart2.append("circle")
+                  .attr("id", a.country+'F' )
+                  .attr("cx", xMetScale("fufive8") + margin.left * 4.8 )
+                  .attr("cy", yFAxisScale(b[3]))
+                  .attr("fill", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width) )
+                  .style("opacity", opa)
+                  .on("click", metricSelectF)
+                  .attr("r", cRadius);
+
+                var oldx2= xMetScale("ufive8") + margin.left*4.8;
+                var oldy2 = yUAxisScale(b[1]);
+                var newx2 = xMetScale("rufive8") + margin.left*4.8;
+                var newy2=yRAxisScale(b[2]);
+                lineChart2.append("line")
+                  .attr("id", a.country)
+                  .attr("x1", oldx2)
+                  .attr("y1", oldy2)
+                  .attr("x2", newx2)
+                  .attr("y2", newy2)
+                  .attr("stroke-width", 2)
+                  .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+                  .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width));
+                oldx2=newx2;
+                oldy2=newy2;
+                newx2 = xMetScale("fufive8") + margin.left*4.8;
+                newy2=yFAxisScale(b[3]);
+                lineChart2.append("line")
+                  .attr("id", a.country)
+                  .attr("x1", oldx2)
+                  .attr("y1", oldy2)
+                  .attr("x2", newx2)
+                  .attr("y2", newy2)
+                  .attr("stroke-width", 2)
+                  .attr("stroke-dasharray", String( useData.indexOf(a.country) % 3))
+                  .attr("stroke", d3.interpolateRainbow(xAxisScale(a.country)/barwindow.width)); 
+              }
+            } ) ;   
+          } ) ; 
+      cdisp=cdispfilter.slice();  
+    }
+  };
+
+  //This function changes the displayed year, by clicking circle in LineChart1
+  //Change the year
+  function changeTime(ycirc){
+    theYear=ycirc.year
+
+    //Change data display in bars
+    barChart1.selectAll("rect")
+      .data(data.filter(function(d){ return d.year==theYear  && useData.includes(d.country) ;}))
+      .attr("y", function(d, i){return rightMetricB(d);})
+      .attr("height", function(d) {return xAxisInt - rightMetricB(d) ;} )
+      .on("mouseover", function(d)
+      {
+        if (cdisp.includes(d.country))
+        {
+          console.log('activated')
+          barChart1.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width", 4);
+
+          lineChart1.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+
+          lineChart2.selectAll('#'+d.country+'U')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country+'R')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country+'F')
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+          lineChart2.selectAll('#'+d.country)
+            .attr("stroke", "gold")
+            .attr("stroke-width",4);
+        }
+      })
+      .on("mouseout", function(d)
+      {
+        if (cdisp.includes(d.country))
+        {
+          console.log('activated')
+          barChart1.selectAll('#'+d.country)
+            .attr("stroke", "red")
+            .attr("stroke-width", 4);
+
+          lineChart1.selectAll('#'+d.country)
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",2);
+
+          lineChart2.selectAll('#'+d.country+'U')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0 );
+          lineChart2.selectAll('#'+d.country+'R')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0);
+          lineChart2.selectAll('#'+d.country+'F')
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",0);
+          lineChart2.selectAll('#'+d.country)
+            .attr("stroke", d3.interpolateRainbow(xAxisScale(d.country)/barwindow.width))
+            .attr("stroke-width",2);
+        }
+        })
+      .on("click", toggleCountry);
+
+    //Change bar chart 1 title
+    barChart1.select("#BC1Title")
+      .text( explainMet(metric) + " by country, "+theYear);
+   
+    //change out the lines in lineChart2.  Can't do this in an elegant way, just tear it down and resurrect, I guess.
+    lineChart2.selectAll("circle")
+      .remove();
+    cdisp.forEach(function(nation)
+    {
+      lineChart2.selectAll('#'+nation)
+        .remove();
+    });
+    drawLG2Stuff();
+    
+    //change line chart 2 title
+    lineChart2.select("#LC2Title")
+      .text( "Malaria mortality metrics, "+theYear);
+  };
+
+  //Changes metric being displayed in vis
+  function metricSelectU(mCircle)
+  { metricSelect("ufive8");};
+  function metricSelectR(mCircle)
+  { metricSelect("rufive8");};
+  function metricSelectF(mCircle)
+  { metricSelect("fufive8");};
+  function metricSelect(chosen)
+  {
+    var oldAxis=metric
+    metric=chosen;
+
+    //change barChart1 title
+    barChart1.select("#BC1Title")
+      .text( explainMet(metric) + " by country, "+theYear);
+
+    //change barChart1 bars
+    barChart1.selectAll("rect")
+      .data(data.filter(function(d){ return d.year==theYear  && useData.includes(d.country) ;}))
+      .attr("y", function(d, i){return rightMetricB(d);})
+      .attr("height", function(d) {return xAxisInt - rightMetricB(d) ;} )
+    
+    //change BarChart1 Axis
+    barChart1.select("#currentAxisB1").remove();
+    yGroup = barChart1.append('g')
+      .attr("id", "currentAxisB1")
+      .attr("transform", "translate( "+ margin.left +", "+ 0 +")")
+      .call(rightAxisB());
+
+    //change lineChart1 title
+    lineChart1.select("#LC1Title")
+      .text( explainMet(metric) + " by year");
+
+    //change lineChart1 Axis
+    lineChart1.select("#currentAxisL1")
+      .remove();
+    yGroup = lineChart1.append('g')
+      .attr("id", "currentAxisL1")
+      .attr("transform", "translate( "+ margin.left +", "+ 0 +")")
+      .call(rightAxisL());
+    
+    lineChart1.selectAll("circle")
+      .remove();
+    cdisp.forEach(function (nation)
+    {
+      lineChart1.selectAll('#'+nation)
+      .remove();
+    });
+    drawLG1Stuff();
+  }
+}) ;
+
+
+</script>
+</body>
+</html>
